@@ -1,17 +1,24 @@
 package library_service;
 
 import entity.Author;
+import entity.Book;
 import io.qameta.allure.Description;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Story;
 import io.restassured.response.Response;
 import models.post.SavingNewBookRq;
 import models.post.SavingNewBookRs;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import steps.dataBaseSteps.RequestExecutor;
 import steps.requestSteps.RequestSender;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static steps.asserts.PostLibraryEndpoint.*;
+import static steps.dataBaseSteps.RecordVerification.*;
 import static steps.requestSteps.RequestSender.postBookResponse;
 import static utils.DataHelper.*;
 
@@ -19,20 +26,37 @@ import static utils.DataHelper.*;
 @Story("Сохранение информации")
 public class PostLibraryTest {
 
+    private RequestExecutor requestExecutor = new RequestExecutor();
+
+    @BeforeEach
+    public void cleanDatabase() {
+        requestExecutor.deleteAll();
+    }
+
     @Test
     @DisplayName("Сохранение новой книги. Позитивный кейс")
     @Description("Получен успешный ответ")
     public void postBookSuccess() {
         Author author = getRegisteredAuthor();
         String bookTitle = getBookTitle();
+        long expBookId = getIdRegisteredBook(author, getBookTitle(), getCurrentDateTime()) + 1;
 
         SavingNewBookRs expectedModel = new SavingNewBookRs();
-        expectedModel.setBookId(getIdRegisteredBook(author, bookTitle) + 1);
+        expectedModel.setBookId(expBookId);
 
         SavingNewBookRs actualModel = postBookResponse(new SavingNewBookRq(bookTitle, author))
                 .as(SavingNewBookRs.class);
 
         shouldBeEquals(actualModel, expectedModel);
+
+        List<Book> actualList = requestExecutor.findByBookTitle(bookTitle);
+
+        updatedShouldConformTemplateInDb(actualList);
+
+        actualList.forEach(book -> book.setUpdated(null));
+
+        shouldBeEqualsInDb(getExpBookList(expBookId, bookTitle, author.getId(), null), actualList);
+
     }
 
     @Test
@@ -47,8 +71,9 @@ public class PostLibraryTest {
 
         checkStatusCode(response, 400);
 
-        commonErrorMessageShouldBeEquals(response, 1001, null);
+        commonErrorMessageShouldBeEquals(response, "1001", null);
 
+        shouldBeEqualsInDb(getEmptyList(), requestExecutor.findAll());
     }
 
     @Test
@@ -63,7 +88,9 @@ public class PostLibraryTest {
 
         checkStatusCode(response, 400);
 
-        commonErrorMessageShouldBeEquals(response, 1001, null);
+        commonErrorMessageShouldBeEquals(response, "1001", null);
+
+        shouldBeEqualsInDb(getEmptyList(), requestExecutor.findAll());
     }
 
     @Test
@@ -76,7 +103,9 @@ public class PostLibraryTest {
 
         checkStatusCode(response, 400);
 
-        commonErrorMessageShouldBeEquals(response, 1001, null);
+        commonErrorMessageShouldBeEquals(response, "1001", null);
+
+        shouldBeEqualsInDb(getEmptyList(), requestExecutor.findAll());
     }
 
     @Test
@@ -89,7 +118,9 @@ public class PostLibraryTest {
 
         checkStatusCode(response, 400);
 
-        commonErrorMessageShouldBeEquals(response, 1001, null);
+        commonErrorMessageShouldBeEquals(response, "1001", null);
+
+        shouldBeEqualsInDb(getEmptyList(), requestExecutor.findAll());
     }
 
     @Test
@@ -102,7 +133,9 @@ public class PostLibraryTest {
 
         checkStatusCode(response, 409);
 
-        commonErrorMessageShouldBeEquals(response, 1004, "Указанный автор не существует в таблице");
+        commonErrorMessageShouldBeEquals(response, "1004", "Указанный автор не существует в таблице");
+
+        shouldBeEqualsInDb(getEmptyList(), requestExecutor.findAll());
     }
 
     @Test
@@ -115,11 +148,20 @@ public class PostLibraryTest {
         SavingNewBookRq request = new SavingNewBookRq(bookTitle, author);
 
         RequestSender.postBookResponse(request);
-        Response response2 = RequestSender.postBookResponse(request);
+        Response response2 = postBookResponse(request);
 
         checkStatusCode(response2, 400);
 
-        commonErrorMessageShouldBeEquals(response2, 1001, null);
+        commonErrorMessageShouldBeEquals(response2, "1001", null);
+
+        List<Book> expectedList = new ArrayList<>();
+        expectedList.add(
+                new Book(getIdRegisteredBook(author, getBookTitle(), getCurrentDateTime()) - 2, bookTitle, author.getId(), null));
+
+        List<Book> actualList = requestExecutor.findByBookTitle(bookTitle);
+        actualList.forEach(book -> book.setUpdated(null));
+
+        shouldBeEqualsInDb(expectedList, actualList);
     }
 
     @Test
@@ -134,6 +176,8 @@ public class PostLibraryTest {
 
         checkStatusCode(response, 400);
 
-        commonErrorMessageShouldBeEquals(response, 1001, null);
+        commonErrorMessageShouldBeEquals(response, "1001", null);
+
+        shouldBeEqualsInDb(getEmptyList(), requestExecutor.findAll());
     }
 }

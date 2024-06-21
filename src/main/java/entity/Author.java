@@ -1,5 +1,4 @@
 package entity;
-
 import jakarta.xml.bind.annotation.*;
 import lombok.*;
 
@@ -13,7 +12,7 @@ import javax.persistence.*;
 @ToString
 @XmlAccessorType(XmlAccessType.NONE)
 @Entity
-@Table(name = "Author")
+@Table(name = "author")
 public class Author {
     @XmlElement(name = "id")
     @Id

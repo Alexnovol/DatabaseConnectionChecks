@@ -6,14 +6,18 @@ import io.qameta.allure.Epic;
 import io.qameta.allure.Story;
 import io.restassured.response.Response;
 import models.get.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import steps.dataBaseSteps.RequestExecutor;
 import steps.requestSteps.RequestSender;
+import java.sql.Timestamp;
 import java.util.*;
 
 
 import static steps.asserts.GetLibraryEndpoint.*;
 import static steps.asserts.GetLibraryEndpoint.checkStatusCodeGetBooksJson;
+import static steps.dataBaseSteps.RecordVerification.shouldBeEqualsInDb;
 import static steps.requestSteps.RequestSender.getBooksJsonResponse;
 import static steps.requestSteps.RequestSender.getBooksXmlResponse;
 import static utils.DataHelper.*;
@@ -22,30 +26,35 @@ import static utils.DataHelper.*;
 @Story("Получение информации")
 public class GetLibraryTest {
 
+    private RequestExecutor requestExecutor = new RequestExecutor();
+
+    @BeforeEach
+    public void cleanDatabase() {
+        requestExecutor.deleteAll();
+    }
+
     @Test
     @DisplayName("Получение списка книг в формате Json. Позитивный кейс")
     @Description("Получены ранее сохраненные книги")
     public void getBooksJsonSuccess() {
         Author author = getRegisteredAuthor();
         String bookTitle = getBookTitle();
-        long bookId = getIdRegisteredBook(author, bookTitle);
+        Timestamp updated = getCurrentDateTime();
+        long bookId = getIdRegisteredBook(author, bookTitle, updated);
 
         GettingAuthorsBooksRq request = new GettingAuthorsBooksRq(Long.toString(author.getId()));
 
         GettingAuthorsBooksRs expectedModel = new GettingAuthorsBooksRs();
-        expectedModel.setBook(new GettingAuthorsBooksRs.Book(bookId, bookTitle, author));
+        expectedModel.setBook(new GettingAuthorsBooksRs.Book(bookId, bookTitle, author,
+                getDateTimeUtc(updated)));
         List<GettingAuthorsBooksRs> expectedList = new ArrayList<>();
         expectedList.add(expectedModel);
 
         List<GettingAuthorsBooksRs> actualList = getBooksJsonResponse(request);
-        List<String> updatedList = new ArrayList<>();
-        actualList.forEach(model -> updatedList.add(model.getBook().getUpdated()));
-
-        shouldConformTemplate(updatedList);
-
-        actualList.forEach(model -> model.getBook().setUpdated(null));
 
         shouldBeEquals(actualList, expectedList);
+
+        shouldBeEqualsInDb(getExpBookList(bookId, bookTitle, author.getId(), updated), requestExecutor.findAll());
 
     }
 
@@ -55,25 +64,21 @@ public class GetLibraryTest {
     public void getBooksXmlSuccess() {
         Author author = getRegisteredAuthor();
         String bookTitle = getBookTitle();
-        long bookId = getIdRegisteredBook(author, bookTitle);
+        Timestamp updated = getCurrentDateTime();
+        long bookId = getIdRegisteredBook(author, bookTitle, updated);
 
         List<GettingAuthorsBooksXmlRs.Book> expectedList = new ArrayList<>();
-        expectedList.add(new GettingAuthorsBooksXmlRs.Book(bookId, bookTitle, author));
+        expectedList.add(new GettingAuthorsBooksXmlRs.Book(bookId, bookTitle, author,
+                getDateTimeUtc(updated)));
         GettingAuthorsBooksXmlRs expectedModel = new GettingAuthorsBooksXmlRs();
         expectedModel.setBooks(expectedList);
 
         GettingAuthorsBooksXmlRs actualModel = getBooksXmlResponse(new GettingAuthorsBooksXmlRq(author))
                 .as(GettingAuthorsBooksXmlRs.class);
 
-        List<String> updatedList = new ArrayList<>();
-
-        actualModel.getBooks().forEach(book -> updatedList.add(book.getUpdated()));
-
-        shouldConformTemplate(updatedList);
-
-        actualModel.getBooks().forEach(book -> book.setUpdated(null));
-
         shouldBeEquals(actualModel, expectedModel);
+
+        shouldBeEqualsInDb(getExpBookList(bookId, bookTitle, author.getId(), updated), requestExecutor.findAll());
 
     }
 
@@ -106,7 +111,7 @@ public class GetLibraryTest {
 
         GettingAuthorsBooksRq request = new GettingAuthorsBooksRq(Long.toString(author.getId()));
 
-        List<GettingAuthorsBooksRs> actualList = RequestSender.getBooksJsonResponse(request);
+        List<GettingAuthorsBooksRs> actualList = getBooksJsonResponse(request);
 
         List<GettingAuthorsBooksRs> expectedList = new ArrayList<>();
 
@@ -122,11 +127,11 @@ public class GetLibraryTest {
 
         GettingAuthorsBooksXmlRq request = new GettingAuthorsBooksXmlRq(author);
 
-        Response response = RequestSender.getBooksXmlResponse(request);
+        Response response = getBooksXmlResponse(request);
 
         checkStatusCode(response, 400);
 
-        commonErrorMessageShouldBeEquals(response, 1001, "Не передан id автора");
+        commonErrorMessageShouldBeEquals(response, "1001", "Не передан обязательный параметр: authorId");
 
     }
 
@@ -142,7 +147,7 @@ public class GetLibraryTest {
 
         checkStatusCode(response, 409);
 
-        commonErrorMessageShouldBeEquals(response, 1004, "Указанный автор не существует в таблице");
+        commonErrorMessageShouldBeEquals(response, "1004", "Указанный автор не существует в таблице");
     }
 
     @Test
@@ -175,7 +180,7 @@ public class GetLibraryTest {
     public void getBooksJsonWithEmptyId() {
         GettingAuthorsBooksRq request = new GettingAuthorsBooksRq();
 
-        List<GettingAuthorsBooksRs> books = RequestSender.getBooksJsonResponse(request);
+        List<GettingAuthorsBooksRs> books = getBooksJsonResponse(request);
 
         GettingAuthorsBooksRs actualModel = books.get(0);
 
@@ -185,7 +190,7 @@ public class GetLibraryTest {
         expectedModel.setBook(new GettingAuthorsBooksRs.Book(0, null, null));
         expectedModel.setStatusCode(400);
         expectedModel.setErrorCode(1001);
-        expectedModel.setErrorMessage("Не передан id автора");
+        expectedModel.setErrorMessage("Не передан обязательный параметр: authorId");
 
         shouldBeEquals(actualModel, expectedModel);
 

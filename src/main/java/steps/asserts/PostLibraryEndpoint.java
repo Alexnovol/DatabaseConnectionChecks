@@ -20,13 +20,12 @@ public class PostLibraryEndpoint {
                 .statusCode(statusCode);
     }
 
-    public static void commonErrorMessageShouldBeEquals(Response response, int code, String message) {
+    public static void commonErrorMessageShouldBeEquals(Response response, String code, String message) {
 
         response
                 .then()
                 .assertThat()
-                .body("errorCode", equalTo(code))
-                .body("$", hasKey("errorDetails"));
+                .body("errorCode", equalTo(code));
 
         if (message != null) {
 

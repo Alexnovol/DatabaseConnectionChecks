@@ -9,6 +9,7 @@ import utils.DataHelper;
 import java.util.List;
 
 import static utils.DataHelper.getBookTitle;
+import static utils.DataHelper.getCurrentDateTime;
 
 public class DatabaseLibraryTest {
 
@@ -23,8 +24,8 @@ public class DatabaseLibraryTest {
 
         requestExecutor.deleteAll();
 
-        requestExecutor.insertBook(bookTitle1, (long) 1);
-        requestExecutor.insertBook(bookTitle2, (long) 2);
+        requestExecutor.insertBook(bookTitle1, (long) 1, getCurrentDateTime());
+        requestExecutor.insertBook(bookTitle2, (long) 2, getCurrentDateTime());
 
         List<Book> books = requestExecutor.findAll();
         System.out.println(books);
